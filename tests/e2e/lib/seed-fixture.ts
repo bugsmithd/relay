@@ -1,13 +1,9 @@
 // Per-test fixture: seeds two users + two workspaces (member of alpha only)
 // against the local Supabase stack via service-role.
+// Refuses to run against any non-local target via assertTestTargetSafe.
 import { test as base, expect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function reqEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env ${name}`);
-  return v;
-}
+import { assertTestTargetSafe } from "../../lib/test-target-guard.ts";
 
 export type SeedFixture = {
   supabaseUrl: string;
@@ -20,9 +16,7 @@ export type SeedFixture = {
 
 export const test = base.extend<{ seed: SeedFixture }>({
   seed: async ({}, use) => {
-    const url = reqEnv("SUPABASE_URL");
-    const anon = reqEnv("SUPABASE_ANON_KEY");
-    const sr = reqEnv("SUPABASE_SERVICE_ROLE");
+    const { url, anonKey, serviceRole: sr } = assertTestTargetSafe();
     const admin: SupabaseClient = createClient(url, sr, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -66,7 +60,7 @@ export const test = base.extend<{ seed: SeedFixture }>({
 
     await use({
       supabaseUrl: url,
-      supabaseAnonKey: anon,
+      supabaseAnonKey: anonKey,
       member: { email: memberEmail, password },
       nonMember: { email: nonMemberEmail, password },
       workspaceA: { slug: wsA.data.slug, name: wsA.data.name },

@@ -6,10 +6,16 @@ NODE ?= node
 PNPM ?= pnpm
 SEMGREP ?= semgrep
 
-.PHONY: help fast-check repo-law tools-version-check ajv-schemas
+.PHONY: help fast-check repo-law tools-version-check ajv-schemas day-1a-closeout
 
 help:
-	@echo "Targets: fast-check repo-law tools-version-check ajv-schemas"
+	@echo "Targets: fast-check repo-law tools-version-check ajv-schemas day-1a-closeout"
+
+# One-shot Day 1A closeout. Pass a fresh run id:
+#   make day-1a-closeout RUN_ID=day-1a-final-2
+day-1a-closeout:
+	@if [ -z "$(RUN_ID)" ]; then echo "RUN_ID required: make day-1a-closeout RUN_ID=<id>"; exit 1; fi
+	$(NODE) scripts/day-1a-closeout.mjs $(RUN_ID)
 
 # fast-check = lightweight gate: typecheck + ajv schema validation.
 # Heavier checks (build, semgrep, governance) live in dedicated targets.

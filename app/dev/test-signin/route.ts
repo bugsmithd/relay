@@ -1,21 +1,19 @@
-// Dev-only e2e backdoor. Refuses to respond unless RELAY_E2E_BACKDOOR=1 AND
-// NODE_ENV!=production. Signs in a pre-seeded test user via password, so the
-// session cookie is set by @supabase/ssr exactly as production would set it.
+// Dev-only e2e backdoor. Refuses to respond unless BOTH:
+//   1. NODE_ENV !== "production" (closes the door in any production build,
+//      even if a misconfigured deploy sets RELAY_E2E_BACKDOOR=1).
+//   2. RELAY_E2E_BACKDOOR === "1" (explicit opt-in for the e2e harness).
 //
-// The route is unreachable in production builds because:
-//   1. The env-flag guard returns 404.
-//   2. The build pipeline never sets RELAY_E2E_BACKDOOR in any deploy env.
-//
-// Tests gate every call on a header that we strip from any logging.
+// Production deploys must NEVER set RELAY_E2E_BACKDOOR. The NODE_ENV check
+// is the second wall: if the env var leaks into a prod deploy by accident,
+// the route still returns 404 because `next start` runs with NODE_ENV=production.
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function backdoorEnabled() {
-  // Single env-var gate. RELAY_E2E_BACKDOOR is never set in any production
-  // deploy. The route returns 404 in any other environment.
+function backdoorEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
   return process.env.RELAY_E2E_BACKDOOR === "1";
 }
 

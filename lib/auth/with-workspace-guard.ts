@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { withSession, type SessionContext } from "@/lib/auth/with-session";
 
 export type WorkspaceContext = SessionContext & {
@@ -9,7 +9,7 @@ const SLUG_RE = /^[a-z0-9-]+$/;
 
 // Safe diagnostic logger. Never logs secrets, JWTs, code/token_hash, emails, or
 // raw Supabase error payloads (which can echo back row contents). Always logs
-// to stderr so structured-log shippers can pick it up.
+// to stderr via console.warn (Next propagates to its server logger).
 function logDeny(reason: string, ctx: { slug: string; userId: string; code?: string }) {
   const safe = {
     component: "with-workspace-guard",
@@ -26,7 +26,8 @@ export async function withWorkspaceGuard<T>(
   fn: (ctx: WorkspaceContext) => Promise<T>,
 ): Promise<T> {
   if (!SLUG_RE.test(workspaceSlug)) {
-    notFound();
+    // Pre-DB rejection. Send to root rather than leaking 404-vs-403 distinction.
+    redirect("/");
   }
   return withSession(async ({ user, supabase }) => {
     const { data, error } = await supabase
@@ -46,13 +47,16 @@ export async function withWorkspaceGuard<T>(
       redirect("/");
     }
     if (!data) {
-      // Either does not exist or user not a member. Same response surface, but
-      // log the deny so we can detect probing in aggregate.
+      // Either does not exist or user not a member. Same response surface.
+      // Per Day 1A plan stop-condition #19: "non-member requesting /w/<other-slug>
+      // gets 403/redirect". Redirect to root keeps the response shape uniform
+      // (no info leak about workspace existence) and avoids relying on
+      // notFound() which renders the framework 404 page (could leak chrome).
       logDeny("not-found-or-not-member", {
         slug: workspaceSlug,
         userId: user.id,
       });
-      notFound();
+      redirect("/");
     }
     return fn({ user, supabase, workspace: data });
   });

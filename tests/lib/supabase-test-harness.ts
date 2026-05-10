@@ -1,23 +1,12 @@
 // Multi-actor test harness against the local Supabase stack.
+// Refuses to run against non-local Supabase via assertTestTargetSafe().
 // - Creates two users (member, non-member) and two workspaces (alpha, beta).
 // - member is in alpha. Nobody is in beta.
 // - Returns one supabase-js client per actor (anon, member, non-member),
 //   plus the admin client for setup/teardown.
-//
-// All resources are slug-prefixed `test-run-<runId>-` so seed-cleanup.mjs
-// can wipe them safely.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function env(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env ${name}`);
-  return v;
-}
-
-const URL = () => env("SUPABASE_URL");
-const ANON = () => env("SUPABASE_ANON_KEY");
-const SERVICE_ROLE = () => env("SUPABASE_SERVICE_ROLE");
+import { assertTestTargetSafe } from "./test-target-guard.ts";
 
 export type Actor = {
   email: string;
@@ -65,9 +54,8 @@ async function makeUser(
 }
 
 export async function setupHarness(): Promise<Harness> {
-  const url = URL();
-  const anonKey = ANON();
-  const sr = SERVICE_ROLE();
+  // Hard refuse to construct the harness against a non-local target.
+  const { url, anonKey, serviceRole: sr } = assertTestTargetSafe();
   const runId = randomRunId();
 
   const admin = createClient(url, sr, {

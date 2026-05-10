@@ -22,14 +22,31 @@ test("signed-in member sees workspace name + email + sign out", async ({
   await expect(page.getByRole("button", { name: /sign out/i })).toBeVisible();
 });
 
-test("signed-in non-member -> 404 (notFound), not 500", async ({
+test("signed-in non-member: redirected away, never sees workspace data", async ({
   page,
   context,
   baseURL,
   seed,
 }) => {
   await signInProgrammatically(context, page, baseURL!, seed.supabaseUrl, seed.nonMember.email, seed.nonMember.password);
-  const resp = await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`);
+  const resp = await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`, {
+    waitUntil: "load",
+  });
+  // Per Day 1A plan stop-condition #19: "non-member ... gets 403/redirect".
+  // We implement via redirect to "/", which yields a 200 on the home page.
+  // Therefore strict-status assert is on FINAL URL (must NOT be the workspace
+  // page) and on absence of any workspace-protected data.
   expect(resp?.status(), "must not 500-leak").not.toBe(500);
-  expect([404, 200]).toContain(resp?.status() ?? 0);
+
+  const finalUrl = new URL(page.url());
+  expect(
+    finalUrl.pathname,
+    "non-member must be redirected away from /w/<slug>",
+  ).not.toBe(`/w/${seed.workspaceA.slug}`);
+  expect(finalUrl.pathname).toMatch(/^(\/|\/login)$/);
+
+  // Hard negative: protected workspace data must not appear on the response.
+  const body = await page.content();
+  expect(body, "workspace name must not leak").not.toContain(seed.workspaceA.name);
+  expect(body, "member email must not leak to non-member").not.toContain(seed.member.email);
 });

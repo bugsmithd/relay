@@ -3,20 +3,25 @@ export const revalidate = 0;
 
 import { sendMagicLinkAction } from "./actions";
 
-export default function LoginPage({
+type LoginSearchParams = { redirect_to?: string; sent?: string; error?: string };
+
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: { redirect_to?: string; sent?: string };
+  searchParams?: Promise<LoginSearchParams>;
 }) {
-  const sent = searchParams?.sent === "1";
+  const sp = (await searchParams) ?? {};
+  const sent = sp.sent === "1";
+  const error = sp.error;
   return (
     <main>
       <h1>Sign in to Relay</h1>
+      {error ? <p role="alert">Sign-in error: {error}</p> : null}
       {sent ? (
         <p>Check your email for a magic link.</p>
       ) : (
         <form action={sendMagicLinkAction}>
-          <input type="hidden" name="redirect_to" value={searchParams?.redirect_to ?? "/"} />
+          <input type="hidden" name="redirect_to" value={sp.redirect_to ?? "/"} />
           <label>
             Email
             <input type="email" name="email" required autoComplete="email" />

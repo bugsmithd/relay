@@ -8,7 +8,10 @@ export const config = {
   matcher: ["/w/:path*"],
 };
 
-export async function middleware(req: NextRequest) {
+// Next 16 deprecated `middleware.ts` in favor of `proxy.ts` with `proxy` export.
+// The function is otherwise identical to the v15 middleware. Edge runtime is
+// not available under proxy; that's fine for Day 1A — we only need Node APIs.
+export async function proxy(req: NextRequest) {
   const url = req.nextUrl;
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
