@@ -1,12 +1,16 @@
 // Day 1A seed cleanup. Service-role + project-ref safety enforced by
 // lib/supabase/admin.ts (sole env reader).
-// Deletes workspaces with slug prefix `test-run-` and users with @relay-test.invalid.
+// Deletes workspaces with slug prefix `test-run-` and users on the seed
+// email domain (current `@relay-local.test`) plus the legacy
+// `@relay-test.invalid` domain so older local junk is purged on first run.
 
 async function main() {
   let supabase;
   let admin;
+  let seedGuards;
   try {
     admin = await import("../lib/supabase/admin.ts");
+    seedGuards = await import("./lib/seed-guards.ts");
   } catch (e) {
     // Module-resolution failure (typo, missing dep). Distinguish from safety
     // rejection so operators see the real cause.
@@ -33,14 +37,21 @@ async function main() {
     .select("slug");
   if (ws.error) throw ws.error;
 
+  // Both the active domain and the legacy one — covers users created before
+  // the rename so a single cleanup run leaves no stale local accounts behind.
+  const seedDomains = [
+    `@${seedGuards.SEED_EMAIL_DOMAIN}`,
+    `@${seedGuards.LEGACY_SEED_EMAIL_DOMAIN}`,
+  ];
   let page = 1;
   let deleted = 0;
   for (;;) {
     const list = await supabase.auth.admin.listUsers({ page, perPage: 200 });
     if (list.error) throw list.error;
-    const targets = list.data.users.filter((u) =>
-      (u.email ?? "").endsWith("@relay-test.invalid"),
-    );
+    const targets = list.data.users.filter((u) => {
+      const email = u.email ?? "";
+      return seedDomains.some((d) => email.endsWith(d));
+    });
     for (const u of targets) {
       const r = await supabase.auth.admin.deleteUser(u.id);
       if (r.error) throw r.error;

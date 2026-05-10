@@ -9,7 +9,12 @@ import {
   ServiceRoleSafetyError,
   assertSeedSafeOrExit,
 } from "../lib/supabase/admin.ts";
-import { SeedArgsError, parseRunId, seedSlug } from "./lib/seed-guards.ts";
+import {
+  SeedArgsError,
+  parseRunId,
+  seedEmail,
+  seedSlug,
+} from "./lib/seed-guards.ts";
 
 async function main() {
   let projectRef: string;
@@ -24,8 +29,8 @@ async function main() {
 
   const supabase = createSupabaseAdminClient({ requireSeedSafety: true });
 
-  const memberEmail = `member-${runId}@relay-test.invalid`;
-  const otherEmail = `nonmember-${runId}@relay-test.invalid`;
+  const memberEmail = seedEmail("member", runId);
+  const otherEmail = seedEmail("nonmember", runId);
   const password = `seed-${runId}-${crypto.randomUUID()}`;
 
   const member = await supabase.auth.admin.createUser({
@@ -62,24 +67,43 @@ async function main() {
   });
   if (wm.error) throw wm.error;
 
+  // Credential file holds the seeded password — sole on-disk record. If the
+  // write fails the seed is unusable (operator can't sign in), so the script
+  // must surface that as a hard failure, not a silent "seeded …" success.
   const credPath = ".supabase-local/seed-credentials.json";
-  mkdirSync(dirname(credPath), { recursive: true });
-  writeFileSync(
-    credPath,
-    JSON.stringify(
-      {
-        project_ref: projectRef,
-        run_id: runId,
-        member: { email: memberEmail, password, workspace_slug: wsA.data.slug },
-        non_member: { email: otherEmail, password, workspace_slug: wsB.data.slug },
-      },
-      null,
-      2,
-    ),
-    { mode: 0o600 },
-  );
+  try {
+    mkdirSync(dirname(credPath), { recursive: true });
+    writeFileSync(
+      credPath,
+      JSON.stringify(
+        {
+          project_ref: projectRef,
+          run_id: runId,
+          member: { email: memberEmail, password, workspace_slug: wsA.data.slug },
+          non_member: { email: otherEmail, password, workspace_slug: wsB.data.slug },
+        },
+        null,
+        2,
+      ),
+      { mode: 0o600 },
+    );
+  } catch (e) {
+    console.error(
+      `seed: failed to write ${credPath}: ${(e as Error).message}. ` +
+        `Aborting so operator does not get a seed without credentials.`,
+    );
+    process.exit(1);
+  }
 
-  console.log(`seeded run-id=${runId} alpha=${wsA.data.slug} beta=${wsB.data.slug}`);
+  // Operator-friendly stdout: explicit credential file path + every value a
+  // manual demo needs, so no one has to guess the email or workspace slug.
+  // Password is intentionally NOT printed; it lives only in the cred file.
+  console.log(`seeded run-id=${runId}`);
+  console.log(`seed_credentials=${credPath}`);
+  console.log(`member_email=${memberEmail}`);
+  console.log(`member_workspace=/w/${wsA.data.slug}`);
+  console.log(`nonmember_email=${otherEmail}`);
+  console.log(`nonmember_workspace=/w/${wsB.data.slug}`);
 }
 
 main().catch((e) => {

@@ -7,6 +7,7 @@
 import { test as base, expect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { assertTestTargetSafe } from "../../lib/test-target-guard.ts";
+import { seedEmail } from "../../../scripts/lib/seed-guards.ts";
 import { deleteAllMail } from "./mailpit.ts";
 
 export type MagicSeedFixture = {
@@ -21,7 +22,7 @@ export const test = base.extend<{ seed: MagicSeedFixture }>({
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const runId = "m" + Math.random().toString(36).slice(2, 10);
-    const userEmail = `member-${runId}@relay-test.invalid`;
+    const userEmail = seedEmail("member", runId);
 
     const cu = await admin.auth.admin.createUser({
       email: userEmail,

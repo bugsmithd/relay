@@ -7,6 +7,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { assertTestTargetSafe } from "./test-target-guard.ts";
+import { seedEmail } from "../../scripts/lib/seed-guards.ts";
 
 export type Actor = {
   email: string;
@@ -69,14 +70,14 @@ export async function setupHarness(): Promise<Harness> {
     admin,
     url,
     anonKey,
-    `member-${runId}@relay-test.invalid`,
+    seedEmail("member", runId),
     `pw-${runId}-${Math.random().toString(36).slice(2)}`,
   );
   const nonMember = await makeUser(
     admin,
     url,
     anonKey,
-    `nonmember-${runId}@relay-test.invalid`,
+    seedEmail("nonmember", runId),
     `pw-${runId}-${Math.random().toString(36).slice(2)}`,
   );
 

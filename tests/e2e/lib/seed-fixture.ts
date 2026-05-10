@@ -4,6 +4,7 @@
 import { test as base, expect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { assertTestTargetSafe } from "../../lib/test-target-guard.ts";
+import { seedEmail } from "../../../scripts/lib/seed-guards.ts";
 
 export type SeedFixture = {
   member: { email: string; password: string };
@@ -20,8 +21,8 @@ export const test = base.extend<{ seed: SeedFixture }>({
     });
     const runId = "e" + Math.random().toString(36).slice(2, 10);
 
-    const memberEmail = `member-${runId}@relay-test.invalid`;
-    const nonMemberEmail = `nonmember-${runId}@relay-test.invalid`;
+    const memberEmail = seedEmail("member", runId);
+    const nonMemberEmail = seedEmail("nonmember", runId);
     const password = `pw-${runId}-${Math.random().toString(36).slice(2)}`;
 
     const m = await admin.auth.admin.createUser({
