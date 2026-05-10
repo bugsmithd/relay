@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { safeRedirectTarget } from "@/lib/auth/redirect-allowlist";
+import { siteOrigin } from "@/lib/auth/site-origin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,27 +30,33 @@ export async function GET(req: NextRequest) {
   const rawType = url.searchParams.get("type");
   const next = safeRedirectTarget(url.searchParams.get("next"));
 
+  // Anchor redirects to SITE_ORIGIN, NOT url.origin: NextRequest.url under
+  // `next dev` can normalize the host (e.g. 127.0.0.1 → localhost), which
+  // would land the user on a host where their freshly-set session cookie is
+  // not scoped. SITE_ORIGIN is also the host emailRedirectTo points the user
+  // back to, so the cookie domain and navigation host stay in lockstep.
+  const origin = siteOrigin();
   const supabase = await createSupabaseServerClient();
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) return NextResponse.redirect(new URL("/login", url.origin));
+    if (error) return NextResponse.redirect(new URL("/login", origin));
   } else if (tokenHash) {
     const type = parseEmailOtpType(rawType);
     if (type === null) {
-      return NextResponse.redirect(new URL("/login", url.origin));
+      return NextResponse.redirect(new URL("/login", origin));
     }
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash: tokenHash,
     });
-    if (error) return NextResponse.redirect(new URL("/login", url.origin));
+    if (error) return NextResponse.redirect(new URL("/login", origin));
   } else {
-    return NextResponse.redirect(new URL("/login", url.origin));
+    return NextResponse.redirect(new URL("/login", origin));
   }
 
   // `next` is from the redirect-allowlist (root or /w/<slug>). Never carries
   // code/token_hash, so nothing sensitive lands in the redirect target or any
   // downstream URL log.
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(new URL(next, origin));
 }

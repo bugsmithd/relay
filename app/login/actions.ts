@@ -4,13 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { safeRedirectTarget } from "@/lib/auth/redirect-allowlist";
-
-function siteOrigin(): string {
-  const env = process.env.SITE_ORIGIN;
-  if (env) return env;
-  // Fall back to throwing only at boot-time configuration error.
-  throw new Error("SITE_ORIGIN env not set");
-}
+import { siteOrigin } from "@/lib/auth/site-origin";
 
 function logDeny(reason: string, extra: Record<string, unknown> = {}) {
   console.warn(

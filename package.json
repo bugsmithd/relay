@@ -12,7 +12,8 @@
     "seed:cleanup": "node --conditions=react-server scripts/seed-cleanup.mjs",
     "test:unit": "node --test tests/auth/magic-link-redirect-allowlist.spec.ts tests/rls/migration-rls-enabled.spec.ts",
     "test:db": "node --conditions=react-server --test tests/rls/workspace-select-membership.spec.ts tests/rls/workspace-write-denial.spec.ts tests/auth/workspace-guard.spec.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:magic": "playwright test --config=playwright.magic.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
