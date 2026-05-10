@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:canonical": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
