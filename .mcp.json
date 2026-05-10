@@ -20,7 +20,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
-        "@playwright/mcp@latest"
+        "@playwright/mcp@0.0.75"
       ],
       "env": {}
     },
@@ -29,7 +29,7 @@
       "command": "pnpm",
       "args": [
         "dlx",
-        "chrome-devtools-mcp@latest",
+        "chrome-devtools-mcp@0.25.0",
         "--isolated"
       ],
       "env": {}
@@ -39,7 +39,7 @@
       "command": "pnpm",
       "args": [
         "dlx",
-        "next-devtools-mcp@latest"
+        "next-devtools-mcp@0.3.10"
       ],
       "env": {}
     }

@@ -11,7 +11,12 @@
 //   - stale-server-guard-proof.txt  (records guard would refuse foreign listener)
 //   - work-log.md                   (subagent split, files changed, exits, verdict)
 //   - closeout-verification.txt     (per-artifact sha256/bytes verification dump)
-// All three appear in manifest.artifact_paths.
+// And requires these pre-staged review/demo artifacts in RUN_DIR before invocation:
+//   - client-demo-summary.md        (sanitized presentable-state summary)
+//   - anti-slop-review.md           (external anti-slop subagent verdict)
+//   - final-independent-review.md   (external independent review subagent verdict)
+// Closeout exits 1 if any pre-staged file is absent. All durable + pre-staged
+// artifacts (and closeout-verification.txt itself) appear in manifest.artifact_paths.
 //
 // Phase ordering is critical to avoid stale-hash bugs: each artifact file is
 // written exactly once before its hash lands anywhere else.
@@ -29,6 +34,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 
 const RUN_ID = process.argv[2];
@@ -41,10 +47,19 @@ const RUN_DIR = resolve(`evidence/runs/${RUN_ID}`);
 mkdirSync(RUN_DIR, { recursive: true });
 
 // Single source of truth for the e2e port. Used both for the pre-spawn
-// lsof-kill cleanup and as Playwright's env, so they cannot drift.
+// fail-closed port-free probe and as Playwright's env, so they cannot drift.
 const E2E_PORT = process.env.E2E_PORT && /^\d+$/.test(process.env.E2E_PORT)
   ? process.env.E2E_PORT
   : "3100";
+
+// Lock e2e host to loopback. Closeout deliberately ignores parent E2E_HOST
+// (which could be 0.0.0.0 on shared dev hosts) so the probe and Playwright
+// always agree on what to bind. Host is forced into PW_HERMETIC_ENV below.
+const E2E_HOST = "127.0.0.1";
+
+// Hard cap on assertPortFree wait. libuv pathologies (DNS hangs, kernel
+// stalls) should not let closeout hang indefinitely; fail closed instead.
+const PORT_PROBE_TIMEOUT_MS = 5000;
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, {
@@ -75,6 +90,56 @@ function record(label, exitExpected, file, result) {
 
 function sha256OfFile(p) {
   return createHash("sha256").update(readFileSync(p)).digest("hex");
+}
+
+// Fail-closed port probe: try to bind <host>:<port> with a transient
+// listener. On success, close it and return. On EADDRINUSE (or any bind
+// error) print the offending PID(s) read-only via lsof and exit 1. Never
+// kills foreign processes — operator may be running an unrelated dev server
+// on the same port and a blind SIGKILL would clobber their work.
+//
+// Host MUST match what Playwright will bind (PW_HERMETIC_ENV.E2E_HOST below)
+// so a parent `E2E_HOST=0.0.0.0` cannot bleed past the probe.
+//
+// PORT_PROBE_TIMEOUT_MS guards against libuv pathologies (DNS hangs, kernel
+// stalls) — closeout fails closed instead of hanging the entire pipeline.
+async function assertPortFree(port, host) {
+  await new Promise((resolveProbe) => {
+    const probe = createServer();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { probe.close(); } catch { /* probe never bound; safe to ignore */ }
+      console.error(
+        `FATAL: assertPortFree timed out after ${PORT_PROBE_TIMEOUT_MS}ms ` +
+          `binding ${host}:${port}. Likely libuv stall or kernel-level lock. ` +
+          `Investigate manually before re-invoking.`,
+      );
+      process.exit(1);
+    }, PORT_PROBE_TIMEOUT_MS);
+    probe.once("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const pids = run("bash", ["-lc", `lsof -ti:${port} || true`]).stdout.trim();
+      console.error(
+        `FATAL: e2e port ${port} not free on ${host} (${err.code ?? err.message}). ` +
+          `Holding PID(s): ${pids || "<none reported>"}. ` +
+          `Closeout will not kill foreign listeners — stop the offending process or ` +
+          `re-invoke with E2E_PORT=<other> and retry.`,
+      );
+      process.exit(1);
+    });
+    probe.listen({ host, port: Number(port) }, () => {
+      probe.close(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolveProbe();
+      });
+    });
+  });
 }
 
 const steps = [];
@@ -140,13 +205,18 @@ steps.push(record("16e hermeticity check", 0, "16e-hermeticity-check.txt",
     { E2E_REUSE_SERVER: "1" } /* even if parent env enables it, unset wins */,
   )));
 
-// Kill any stale Next process on the e2e port BEFORE Playwright spawns its own.
-sh(`lsof -ti:${E2E_PORT} | xargs -r kill -9 2>/dev/null; true`);
+// Fail-closed: refuse to spawn Playwright if the e2e port is already held.
+// Old behavior blindly SIGKILLed any listener (could clobber operator's
+// unrelated dev server). New behavior probes via net.createServer and exits
+// with the offending PID(s) printed read-only. Top-level await is supported
+// in .mjs files (Node ≥14.8) and the script is invoked via `node` directly.
+await assertPortFree(E2E_PORT, E2E_HOST);
 // Hermeticity (offense): explicit `unset E2E_REUSE_SERVER` AFTER `source
 // .env.local` so .env.local cannot re-enable Playwright reuse mid-closeout.
-// Hermeticity (defense): empty E2E_REUSE_SERVER in spawn env so even a
-// shell that never reads .env.local sees the flag absent.
-const PW_HERMETIC_ENV = { E2E_REUSE_SERVER: "", E2E_PORT };
+// Hermeticity (defense): empty E2E_REUSE_SERVER + locked E2E_HOST in spawn
+// env so even a shell that never reads .env.local sees the flag absent and
+// Playwright cannot bind a different host than the probe just verified.
+const PW_HERMETIC_ENV = { E2E_REUSE_SERVER: "", E2E_PORT, E2E_HOST };
 steps.push(record("17-19 playwright e2e", 0, "17-19-e2e.txt",
   sh(`${LOAD_ENV} unset E2E_REUSE_SERVER; pnpm exec playwright test`, PW_HERMETIC_ENV)));
 
@@ -205,16 +275,18 @@ function renderWorkLog(verdict) {
     `     proving the ancestry walk would not include our process.`,
     `     Closeout strips E2E_REUSE_SERVER both in spawn env and via 'unset E2E_REUSE_SERVER' after`,
     `     '. .env.local'; recorded by step 16e hermeticity-check.`,
-    `     Single E2E_PORT constant (default 3100, env-overridable) used for both lsof-kill and`,
-    `     Playwright env.`,
+    `     Single E2E_PORT constant (default 3100, env-overridable) used for both fail-closed`,
+    `     port-free probe and Playwright env.`,
     "",
-    `### Subagent 4 — Anti-slop review`,
-    `Spawned via Agent tool. Output appended to run dir as subagent-4-antislop-review.md after`,
-    `closeout completes (file is NOT in manifest.artifact_paths because it post-dates the manifest).`,
+    `### External review artifacts (pre-staged into run dir before closeout invocation)`,
     "",
-    `### Subagent 5 — Final independent review`,
-    `Spawned via Agent tool. Output appended to run dir as final-independent-review.md after`,
-    `closeout completes (file is NOT in manifest.artifact_paths for the same reason).`,
+    `| Artifact | Required | In manifest |`,
+    `|---|---|---|`,
+    `| client-demo-summary.md | yes | yes |`,
+    `| anti-slop-review.md | yes | yes |`,
+    `| final-independent-review.md | yes | yes |`,
+    "",
+    `Closeout aborts pre-manifest if any are missing.`,
     "",
     `## Commands run (with exit codes)`,
     "",
@@ -275,11 +347,34 @@ function buildArtifactList(extras = []) {
   return arr;
 }
 
-// Per-artifact hashes for the verification dump (steps + work-log.md). These
-// are the SAME hashes that will land in manifest.artifact_paths — work-log.md
-// is now finalized, so its hash will not change between this dump and the
-// manifest write below.
-const preManifestArtifacts = buildArtifactList(["work-log.md"]);
+// Pre-staged external review artifacts. Closeout does NOT spawn the agents
+// that produce these — Lead pre-stages them into RUN_DIR before invoking
+// closeout. We refuse to build the manifest if any are missing so the
+// manifest cannot claim coverage of artifacts that do not exist on disk.
+const PRE_STAGED_REQUIRED = [
+  "client-demo-summary.md",
+  "final-independent-review.md",
+  "anti-slop-review.md",
+];
+const missingPreStaged = PRE_STAGED_REQUIRED.filter((f) => !existsSync(join(RUN_DIR, f)));
+if (missingPreStaged.length > 0) {
+  console.error(
+    `FATAL: missing pre-staged review artifacts in ${RUN_DIR}:\n  - ` +
+      missingPreStaged.join("\n  - ") +
+      `\nPre-stage these files into evidence/runs/${RUN_ID}/ before invoking closeout.`,
+  );
+  process.exit(1);
+}
+
+// Per-artifact hashes for the verification dump (steps + work-log.md +
+// pre-staged review artifacts). These are the SAME hashes that will land in
+// manifest.artifact_paths — work-log.md is finalized and the pre-staged
+// files are read-only inputs, so hashes will not change between this dump
+// and the manifest write below.
+const preManifestArtifacts = buildArtifactList([
+  "work-log.md",
+  ...PRE_STAGED_REQUIRED,
+]);
 
 const perArtifactDetail = [];
 let shaOk = true;
@@ -347,7 +442,9 @@ const verificationLines = [
   `Closeout strips E2E_REUSE_SERVER in two places:`,
   `  - spawn env: PW_HERMETIC_ENV.E2E_REUSE_SERVER = ""`,
   `  - bash command: \`unset E2E_REUSE_SERVER\` after \`source .env.local\``,
-  `E2E_PORT used for both lsof-kill and Playwright env: ${E2E_PORT}`,
+  `E2E_PORT used for both fail-closed port-free probe and Playwright env: ${E2E_PORT}`,
+  `E2E_HOST locked to loopback for both probe and Playwright env (parent E2E_HOST ignored): ${E2E_HOST}`,
+  `assertPortFree timeout: ${PORT_PROBE_TIMEOUT_MS}ms`,
   ``,
   `## Final verdict`,
   ``,
@@ -356,10 +453,14 @@ const verificationLines = [
 writeFileSync(verificationPath, verificationLines.join("\n") + "\n");
 
 // ---- Phase F: build final manifest including verification.txt ----
-// Re-hash all artifacts (steps + work-log.md hash unchanged since Phase D;
-// closeout-verification.txt is hashed for the first time — it didn't exist
-// before Phase E).
-const finalArtifacts = buildArtifactList(["work-log.md", "closeout-verification.txt"]);
+// Re-hash all artifacts (steps + work-log.md + pre-staged review files
+// unchanged since Phase D; closeout-verification.txt is hashed for the
+// first time — it didn't exist before Phase E).
+const finalArtifacts = buildArtifactList([
+  "work-log.md",
+  ...PRE_STAGED_REQUIRED,
+  "closeout-verification.txt",
+]);
 const manifest = {
   schema_version: 1,
   run_id: RUN_ID,
@@ -391,9 +492,16 @@ const ajv = sh(
     `--strict=true --all-errors`,
 );
 const ajvOk = ajv.status === 0;
+if (!ajvOk) {
+  verifyResults.push({
+    check: "ajv-schema",
+    ok: false,
+    detail: ajv.stdout.trim().slice(0, 500),
+  });
+}
 
 console.log("\n=== Verification ===");
-console.log(`OK   ajv-schema :: ${ajv.stdout.trim()}`);
+console.log(`${ajvOk ? "OK  " : "FAIL"} ajv-schema :: ${ajv.stdout.trim()}`);
 for (const v of verifyResults) {
   const tag = v.ok ? "OK  " : "FAIL";
   console.log(`${tag} ${v.check}${v.detail ? ` :: ${v.detail}` : ""}`);

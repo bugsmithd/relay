@@ -11,8 +11,8 @@ https://mcpmarket.com/tools/skills/sentry-security-pii-protection-1
 
 When invoked, load and follow:
 
-`~/.claude/skills/sentry-security-basics/SKILL.md`
+`.claude/skills/sentry-security-basics/SKILL.md`
 
 Use the canonical skill references under:
 
-`~/.claude/skills/sentry-security-basics/references/`
+`.claude/skills/sentry-security-basics/references/`
