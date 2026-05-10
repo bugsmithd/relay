@@ -1,0 +1,34 @@
+# node / next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# env
+.env
+.env.local
+.env.*.local
+
+# supabase local + seed
+.supabase-local/
+.supabase-local/seed-credentials.json
+supabase/.branches/
+supabase/.temp/
+
+# evidence subpaths (run dirs are gitignored; schemas + trust-boundary-paths.json are tracked)
+evidence/runs/
+evidence/scratch/
+
+# tooling state outside repo
+.claude/settings.local.json
+.omx/
+
+# OS / editor
+.DS_Store
+*.log
+
+# playwright
+test-results/
+playwright-report/
+playwright/.cache/

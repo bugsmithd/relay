@@ -1,0 +1,28 @@
+rules:
+  - id: service-role-boundary
+    message: |
+      SUPABASE_SERVICE_ROLE may only be read in lib/supabase/admin.ts.
+      Move usage there, or call createSupabaseAdminClient() from a server-only path.
+    severity: ERROR
+    languages: [typescript, javascript]
+    paths:
+      exclude:
+        # admin.ts is the SOLE app-code reader of SUPABASE_SERVICE_ROLE.
+        - "**/lib/supabase/admin.ts"
+        # Bundle-leak scanner inherently needs to know the value to grep for.
+        # It runs only as a CI/dev script and never ships in any bundle.
+        - "**/scripts/check-bundle-leak.mjs"
+        # Self-test harness for the bundle-leak scanner needs to plant a
+        # known value; the env it reads is gated to leak-test-/synthetic- prefixes.
+        - "**/scripts/test-bundle-leak-fixture.mjs"
+        # Pre-commit verifier shell scripts only mention the literal string in
+        # error messages and grep patterns, not as env reads. Excluded so they
+        # don't trip the rule on themselves.
+        - "**/scripts/precommit.sh"
+        - "**/scripts/prove-precommit-service-role-rejection.sh"
+        # Tests assert handling of the env name; not actual reads in app code.
+        - "**/tests/**"
+    pattern-either:
+      - pattern: process.env.SUPABASE_SERVICE_ROLE
+      - pattern: process.env["SUPABASE_SERVICE_ROLE"]
+      - pattern: process.env['SUPABASE_SERVICE_ROLE']

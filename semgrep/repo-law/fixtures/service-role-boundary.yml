@@ -1,0 +1,10 @@
+rules:
+  - id: service-role-boundary
+    message: |
+      SUPABASE_SERVICE_ROLE may only be read in lib/supabase/admin.ts.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-either:
+      - pattern: process.env.SUPABASE_SERVICE_ROLE
+      - pattern: process.env["SUPABASE_SERVICE_ROLE"]
+      - pattern: process.env['SUPABASE_SERVICE_ROLE']

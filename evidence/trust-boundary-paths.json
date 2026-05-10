@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "globs": [
+    "lib/auth/**",
+    "lib/supabase/admin.ts",
+    "lib/recap/**",
+    "lib/search/**",
+    "supabase/migrations/**",
+    "tests/auth/**",
+    "tests/rls/**",
+    "tests/realtime/**",
+    "tests/security/**",
+    "semgrep/repo-law/**",
+    ".github/workflows/**",
+    "middleware.ts",
+    "evidence/manifest.schema.json",
+    "evidence/trust-boundary-paths.json",
+    "evidence/trust-boundary-paths.schema.json"
+  ],
+  "notes": "This file is itself a trust-boundary path (OR-Ev-1). Edits require paired Claude review (Day 2B+)."
+}
