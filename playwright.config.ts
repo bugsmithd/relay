@@ -1,7 +1,20 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = Number(process.env.E2E_PORT ?? 3100);
-const HOST = process.env.E2E_HOST ?? "127.0.0.1";
+// Treat empty-string env as unset so callers like the closeout script can
+// safely clear hermetic-bypass envs without nuking the port.
+function envInt(name: string, fallback: number): number {
+  const v = process.env[name];
+  if (!v) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+function envStr(name: string, fallback: string): string {
+  const v = process.env[name];
+  return v && v.length > 0 ? v : fallback;
+}
+
+const PORT = envInt("E2E_PORT", 3100);
+const HOST = envStr("E2E_HOST", "127.0.0.1");
 
 // Hermetic by default: refuse to reuse a stale local Next server. Devs can
 // opt in to fast iteration via E2E_REUSE_SERVER=1.

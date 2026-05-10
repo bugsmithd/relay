@@ -111,10 +111,11 @@ steps.push(record("16c security backdoor regression", 0, "16c-tests-security-bac
 
 // Kill any stale Next process on the e2e port BEFORE Playwright spawns its own.
 sh("lsof -ti:3100 | xargs -r kill -9 2>/dev/null; true");
-// Hermeticity: forcibly clear any inherited Playwright opt-out env so closeout
-// always runs against a fresh server. Devs can still set E2E_REUSE_SERVER=1 in
-// their shell for fast iteration; closeout strips it.
-const PW_HERMETIC_ENV = { E2E_REUSE_SERVER: "", E2E_PORT: "" };
+// Hermeticity: forcibly clear any inherited reuse-server opt-out so closeout
+// always spawns a fresh server. (Do NOT clear E2E_PORT here — empty string
+// would be coerced to Number("") === 0 by playwright.config.ts and bind to
+// an unreachable port.)
+const PW_HERMETIC_ENV = { E2E_REUSE_SERVER: "" };
 steps.push(record("17-19 playwright e2e", 0, "17-19-e2e.txt",
   sh(`${LOAD_ENV} pnpm exec playwright test`, PW_HERMETIC_ENV)));
 
