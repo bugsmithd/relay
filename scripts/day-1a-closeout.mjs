@@ -356,8 +356,9 @@ const verificationLines = [
 writeFileSync(verificationPath, verificationLines.join("\n") + "\n");
 
 // ---- Phase F: build final manifest including verification.txt ----
-// Recompute work-log.md sha (in case the safety-net rewrite above fired) and
-// hash verification.txt for the first time (it didn't exist before this point).
+// Re-hash all artifacts (steps + work-log.md hash unchanged since Phase D;
+// closeout-verification.txt is hashed for the first time — it didn't exist
+// before Phase E).
 const finalArtifacts = buildArtifactList(["work-log.md", "closeout-verification.txt"]);
 const manifest = {
   schema_version: 1,
