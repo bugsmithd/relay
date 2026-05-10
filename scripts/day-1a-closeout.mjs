@@ -168,8 +168,13 @@ const verifyResults = [
     detail: allStepsOk ? "all match" : "see step dump" },
 ];
 
-// Pre-render verdict so work-log.md only gets written once.
-let preVerdict = allStepsOk && treeClean ? "PASS" : "BLOCK";
+// Pre-render verdict so work-log.md only gets written once. shaOk is
+// recomputed below; if it diverges from "true" we treat it as fatal IO drift
+// (exit 1) instead of carrying a BLOCK verdict back into the artifact files,
+// which would force a second work-log.md rewrite and re-introduce the prior
+// staleness bug. shaOk failure means a file we just wrote does not match its
+// own bytes — programming error, not a recoverable closeout outcome.
+const preVerdict = allStepsOk && treeClean ? "PASS" : "BLOCK";
 
 // ---- Phase C: write work-log.md (once, with verdict) ----
 function renderWorkLog(verdict) {
@@ -298,18 +303,23 @@ for (const a of preManifestArtifacts) {
 }
 verifyResults.push({ check: "artifact-sha256-bytes", ok: shaOk, detail: shaOk ? "all match" : "see below" });
 
+if (!shaOk) {
+  // Just-written files disagree with their own bytes. Programming/IO bug, not
+  // a recoverable closeout state. Refuse to write verification.txt or manifest
+  // because doing so would either reference stale hashes or require rewriting
+  // work-log.md (which would re-introduce the staleness defect).
+  console.error("FATAL: artifact-sha256-bytes drift between write and re-read");
+  for (const line of perArtifactDetail) console.error(line);
+  process.exit(1);
+}
+
 const stepDetail = steps.map(
   (s) => `${s.ok ? "OK" : "FAIL"}  ${s.label}  exit=${s.exit}  expected=${s.exitExpected}`,
 );
 
-const verdict = verifyResults.every((v) => v.ok) ? "PASS" : "BLOCK";
-
-// If the verdict shifted (it shouldn't — we computed conservatively above),
-// rewrite work-log.md and recompute its hash. We aim for this branch never
-// to fire in practice; it's a safety net.
-if (verdict !== preVerdict) {
-  writeFileSync(workLogPath, renderWorkLog(verdict));
-}
+// shaOk is true here (we'd have exited otherwise) and the only other inputs
+// to verdict are allStepsOk + treeClean, which preVerdict already captured.
+const verdict = preVerdict;
 
 // ---- Phase E: write closeout-verification.txt ----
 const verificationPath = join(RUN_DIR, "closeout-verification.txt");
