@@ -18,6 +18,24 @@ Older plan revisions (v7–v10) are background review history. Do not read them 
 
 We are executing the grounded plan. Do not propose v11/v12 revisions or new pre-flight reviews. New findings during execution are logged as Day-6+ follow-ups, not week-1 blockers. Cut order is in the plan; use it instead of inventing.
 
+## Claude capabilities visible in repo
+
+Repo-local Claude skills live under `.claude/skills/`; project MCPs live in `.mcp.json`.
+This is intentional transparency: Relay review/implementation runs should not depend on hidden user-global capability assumptions.
+
+Use these skills when they match the task:
+
+- `$caveman`, `$caveman-review`, `$caveman-commit` for terse output/review/commit help.
+- `$analyze` for read-only repo/evidence analysis.
+- `$code-review` for Day-scope/spec/evidence review.
+- `$security-review` for auth/RLS/cookie/secret/trust-boundary review.
+- `$sentry-security-basics` or `$sentry-security-pii-protection` for Sentry PII/data-scrubbing/security checks.
+- `$ai-slop-cleaner` for behavior-preserving anti-slop cleanup/review.
+- `$commit-work` for Lore-format commit workflow.
+
+Use `.mcp.json` servers when needed for current docs/runtime evidence: `context7`, `atlassian`, `supabase`, `sentry`, `playwright`, `chrome-devtools`, and `next-devtools`. Use GitHub from user/plugin scope when authenticated.
+Do not fake MCP evidence; if an MCP needs authentication, record that blocker or authenticate explicitly.
+
 ## Repo state
 
 Fresh app repo at `/Users/divyanshurathore/dev/personal/relay`. As of this cleanup: `CLAUDE.md`, `.planning/claude-code-slack-agent-gates-week1-grounded-20260509.md`, and `docs/decisions/backend.md` exist; `.omx/` runtime state and `.claude/settings.local.json` remain outside the repo. No `git init`, no `package.json`, no `Makefile`, no migrations, no tests. The first Day 1A action is project init.
