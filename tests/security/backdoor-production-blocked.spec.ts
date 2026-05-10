@@ -159,13 +159,7 @@ test("POST backdoor returns 404 in production build even with RELAY_E2E_BACKDOOR
   assert.ok(!/"ok"\s*:\s*true/.test(text), "response leaked an ok payload");
 });
 
-test("GET backdoor never leaks an ok payload in production build", async () => {
-  // Route only exports POST, so GET in production may surface as 404 or 405
-  // depending on Next's method-routing. Either is fine; what's not fine is any
-  // response shape that confirms the backdoor is reachable.
-  const r = await fetch(`http://${HOST}:${PORT}/dev/test-signin`, { method: "GET" });
-  assert.ok([404, 405].includes(r.status), `expected 404|405 GET, got ${r.status}`);
-  const text = await r.text();
-  assert.ok(!/"ok"\s*:\s*true/.test(text), "GET response leaked an ok payload");
-  assert.ok(!/backdoor[_-]?enabled/i.test(text), "GET response surfaced backdoor state");
-});
+// (Removed prior "GET backdoor never leaks an ok payload" test: Next 16
+// returns 405 for GET against a POST-only route regardless of NODE_ENV /
+// RELAY_E2E_BACKDOOR. The case was tautological and did not exercise
+// backdoorEnabled(). The POST test above is the load-bearing assertion.)
