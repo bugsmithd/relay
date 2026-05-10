@@ -44,3 +44,10 @@ ajv-schemas:
 	  -s evidence/trust-boundary-paths.schema.json \
 	  -d evidence/trust-boundary-paths.json \
 	  --strict=true --all-errors
+	# Validate any manifest.json under evidence/runs/* if present.
+	@for m in $$(ls evidence/runs/*/manifest.json 2>/dev/null); do \
+	  echo "ajv: $$m"; \
+	  $(PNPM) exec ajv validate --spec=draft2020 -c ajv-formats \
+	    -s evidence/manifest.schema.json -d $$m \
+	    --strict=true --all-errors || exit 1; \
+	done
