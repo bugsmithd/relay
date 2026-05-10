@@ -54,8 +54,13 @@ export function extractMagicLink(detail: MailpitMessageDetail): string {
   const re = /<a[^>]+href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
   const m = re.exec(html);
   if (!m) {
+    // Do NOT echo any portion of the body: even a 200-char head can leak the
+    // /auth/v1/verify token, redirect_to, or PKCE code if the regex misses
+    // for a different reason than "no anchor present" (e.g. attribute order).
+    // Surface only the minimum diagnostic facts.
+    const anchors = (html.match(/<a\b/gi) ?? []).length;
     throw new Error(
-      `magic-link not found in HTML body. body[0..200]=${html.slice(0, 200)}`,
+      `magic-link not found: body bytes=${html.length}, anchor_count=${anchors}`,
     );
   }
   // Mailpit HTML escapes `&` to `&amp;` inside attribute values; un-escape so

@@ -44,7 +44,11 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL: `http://${HOST}:${PORT}`,
-    trace: "retain-on-failure",
+    // trace OFF for the magic-link suite: a retained trace would archive the
+    // Supabase /auth/v1/verify URL (token + redirect_to + code) and any
+    // Set-Cookie chunks. The real-flow assertions are sufficient signal; we
+    // do not need a captured trace to debug them.
+    trace: "off",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
@@ -52,7 +56,12 @@ export default defineConfig({
     url: `http://${HOST}:${PORT}/`,
     reuseExistingServer: REUSE,
     timeout: 180_000,
-    // No RELAY_E2E_BACKDOOR. Real flow only.
-    env: {},
+    // Playwright merges webServer.env over process.env (it does not replace
+    // it). Explicitly clear RELAY_E2E_BACKDOOR so an inherited value (set by
+    // the operator's shell or by the closeout script) cannot turn the
+    // /dev/test-signin backdoor on under the real-flow suite.
+    env: {
+      RELAY_E2E_BACKDOOR: "",
+    },
   },
 });
