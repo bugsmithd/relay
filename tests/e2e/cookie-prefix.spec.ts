@@ -7,7 +7,7 @@ test("session cookie carries prefix + HttpOnly + Secure + SameSite=Lax", async (
   baseURL,
   seed,
 }) => {
-  await signInProgrammatically(context, page, baseURL!, seed.supabaseUrl, seed.member.email, seed.member.password);
+  await signInProgrammatically(context, baseURL!, seed.member.email, seed.member.password);
   await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`, { waitUntil: "load" });
 
   const cookies = await context.cookies();

@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
   if (!backdoorEnabled()) {
     return new NextResponse("not found", { status: 404 });
   }
+  // Surface backdoor-active state in logs so a misconfigured deploy is visible.
+  console.warn(JSON.stringify({ component: "test-signin", reason: "backdoor-active" }));
   let body: { email?: string; password?: string };
   try {
     body = await req.json();

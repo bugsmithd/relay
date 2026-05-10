@@ -6,8 +6,6 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { assertTestTargetSafe } from "../../lib/test-target-guard.ts";
 
 export type SeedFixture = {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   member: { email: string; password: string };
   nonMember: { email: string; password: string };
   workspaceA: { slug: string; name: string };
@@ -16,7 +14,7 @@ export type SeedFixture = {
 
 export const test = base.extend<{ seed: SeedFixture }>({
   seed: async ({}, use) => {
-    const { url, anonKey, serviceRole: sr } = assertTestTargetSafe();
+    const { url, serviceRole: sr } = assertTestTargetSafe();
     const admin: SupabaseClient = createClient(url, sr, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -59,8 +57,6 @@ export const test = base.extend<{ seed: SeedFixture }>({
     if (wm.error) throw wm.error;
 
     await use({
-      supabaseUrl: url,
-      supabaseAnonKey: anonKey,
       member: { email: memberEmail, password },
       nonMember: { email: nonMemberEmail, password },
       workspaceA: { slug: wsA.data.slug, name: wsA.data.name },

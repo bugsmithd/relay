@@ -15,7 +15,7 @@ test("signed-in member sees workspace name + email + sign out", async ({
   baseURL,
   seed,
 }) => {
-  await signInProgrammatically(context, page, baseURL!, seed.supabaseUrl, seed.member.email, seed.member.password);
+  await signInProgrammatically(context, baseURL!, seed.member.email, seed.member.password);
   await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`);
   await expect(page.getByRole("heading", { name: seed.workspaceA.name })).toBeVisible();
   await expect(page.getByText(seed.member.email)).toBeVisible();
@@ -28,7 +28,7 @@ test("signed-in non-member: redirected away, never sees workspace data", async (
   baseURL,
   seed,
 }) => {
-  await signInProgrammatically(context, page, baseURL!, seed.supabaseUrl, seed.nonMember.email, seed.nonMember.password);
+  await signInProgrammatically(context, baseURL!, seed.nonMember.email, seed.nonMember.password);
   const resp = await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`, {
     waitUntil: "load",
   });

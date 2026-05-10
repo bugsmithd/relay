@@ -4,12 +4,26 @@
 
 async function main() {
   let supabase;
+  let admin;
   try {
-    const admin = await import("../lib/supabase/admin.ts");
+    admin = await import("../lib/supabase/admin.ts");
+  } catch (e) {
+    // Module-resolution failure (typo, missing dep). Distinguish from safety
+    // rejection so operators see the real cause.
+    console.error("seed-cleanup: cannot import admin client:");
+    console.error(e?.stack ?? e);
+    process.exit(2);
+  }
+  try {
     supabase = admin.createSupabaseAdminClient({ requireSeedSafety: true });
   } catch (e) {
-    console.error(e?.message ?? e);
-    process.exit(1);
+    if (e instanceof admin.ServiceRoleSafetyError) {
+      console.error(`seed-cleanup: ${e.message}`);
+      process.exit(1);
+    }
+    console.error("seed-cleanup: unexpected error constructing admin client:");
+    console.error(e?.stack ?? e);
+    process.exit(2);
   }
 
   const ws = await supabase
@@ -40,6 +54,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e?.message ?? e);
+  console.error("seed-cleanup: " + (e?.message ?? e));
   process.exit(1);
 });

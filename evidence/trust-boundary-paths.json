@@ -12,7 +12,7 @@
     "tests/security/**",
     "semgrep/repo-law/**",
     ".github/workflows/**",
-    "middleware.ts",
+    "proxy.ts",
     "evidence/manifest.schema.json",
     "evidence/trust-boundary-paths.json",
     "evidence/trust-boundary-paths.schema.json"

@@ -9,7 +9,6 @@ const nextConfig = {
   // Pin tracing root to this app so Next stops scanning the parent's
   // pnpm-lock.yaml ("multiple lockfiles detected" warning).
   outputFileTracingRoot: __dirname,
-  experimental: {},
 };
 
 export default nextConfig;

@@ -10,7 +10,11 @@ const SLUG_RE = /^[a-z0-9-]+$/;
 // Safe diagnostic logger. Never logs secrets, JWTs, code/token_hash, emails, or
 // raw Supabase error payloads (which can echo back row contents). Always logs
 // to stderr via console.warn (Next propagates to its server logger).
-function logDeny(reason: string, ctx: { slug: string; userId: string; code?: string }) {
+function logDeny(
+  reason: string,
+  ctx: { slug: string; userId: string; code?: string },
+  level: "warn" | "error" = "warn",
+) {
   const safe = {
     component: "with-workspace-guard",
     reason,
@@ -18,7 +22,9 @@ function logDeny(reason: string, ctx: { slug: string; userId: string; code?: str
     user_id: ctx.userId,
     code: ctx.code ?? null,
   };
-  console.warn(JSON.stringify(safe));
+  const line = JSON.stringify(safe);
+  if (level === "error") console.error(line);
+  else console.warn(line);
 }
 
 export async function withWorkspaceGuard<T>(
@@ -39,11 +45,12 @@ export async function withWorkspaceGuard<T>(
     if (error) {
       // RLS / DB errors fail closed. Log a structured diagnostic with only the
       // PostgREST error code (e.g. "PGRST116", "42501") — no message, no detail.
-      logDeny("db-error", {
-        slug: workspaceSlug,
-        userId: user.id,
-        code: error.code,
-      });
+      // DB / RLS errors are alert-class — not the same as a non-member visit.
+      logDeny(
+        "db-error",
+        { slug: workspaceSlug, userId: user.id, code: error.code },
+        "error",
+      );
       redirect("/");
     }
     if (!data) {

@@ -63,14 +63,24 @@ after(async () => {
   }
 });
 
-test("backdoor returns 404 in production build even with RELAY_E2E_BACKDOOR=1", async () => {
+test("POST backdoor returns 404 in production build even with RELAY_E2E_BACKDOOR=1", async () => {
   const r = await fetch(`http://${HOST}:${PORT}/dev/test-signin`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: "x@y.invalid", password: "irrelevant" }),
   });
   assert.equal(r.status, 404, `expected 404 in production NODE_ENV, got ${r.status}`);
-  // Body must not include any signed-in marker, JSON ok, etc.
   const text = await r.text();
   assert.ok(!/"ok"\s*:\s*true/.test(text), "response leaked an ok payload");
+});
+
+test("GET backdoor never leaks an ok payload in production build", async () => {
+  // Route only exports POST, so GET in production may surface as 404 or 405
+  // depending on Next's method-routing. Either is fine; what's not fine is any
+  // response shape that confirms the backdoor is reachable.
+  const r = await fetch(`http://${HOST}:${PORT}/dev/test-signin`, { method: "GET" });
+  assert.ok([404, 405].includes(r.status), `expected 404|405 GET, got ${r.status}`);
+  const text = await r.text();
+  assert.ok(!/"ok"\s*:\s*true/.test(text), "GET response leaked an ok payload");
+  assert.ok(!/backdoor[_-]?enabled/i.test(text), "GET response surfaced backdoor state");
 });

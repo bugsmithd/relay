@@ -9,7 +9,7 @@ test("no JWT-shaped value in localStorage after sign-in + workspace load", async
   baseURL,
   seed,
 }) => {
-  await signInProgrammatically(context, page, baseURL!, seed.supabaseUrl, seed.member.email, seed.member.password);
+  await signInProgrammatically(context, baseURL!, seed.member.email, seed.member.password);
   await page.goto(`${baseURL}/w/${seed.workspaceA.slug}`);
 
   const offenders = await page.evaluate((re) => {

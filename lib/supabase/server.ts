@@ -10,12 +10,11 @@ function requireEnv(name: string): string {
   return v;
 }
 
-// Single createServerClient construction. Used from Server Components,
-// Route Handlers, and Server Actions. Per @supabase/ssr v0.10 guidance,
-// `cookieStore.set` calls during Server Component render throw at runtime;
-// we swallow that specific failure mode because Next 16's proxy (formerly
-// middleware) refreshes the session cookie on every navigation, which means
-// the Server Component's failed write is harmless.
+// Detect Next's "called from a Server Component" cookies.set() error so the
+// try/catch in setAll only swallows that specific failure mode. Any other
+// error (oversized cookie, invalid name, etc.) is rethrown.
+const SERVER_COMPONENT_COOKIE_ERROR = /can only be modified|Cookies can only be modified/i;
+
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
   const url = requireEnv("SUPABASE_URL");
@@ -34,20 +33,29 @@ export async function createSupabaseServerClient() {
         return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
       },
       setAll(cookiesToSet) {
-        try {
-          for (const { name, value, options } of cookiesToSet) {
-            const opts: CookieOptions = {
-              ...options,
-              httpOnly: true,
-              secure: true,
-              sameSite: "lax",
-              path: "/",
-            };
+        for (const { name, value, options } of cookiesToSet) {
+          const opts: CookieOptions = {
+            ...options,
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            path: "/",
+            // Strip Domain explicitly so __Host- prefix invariant holds even
+            // if Supabase ever populates a domain.
+            domain: undefined,
+          };
+          try {
             cookieStore.set(name, value, opts);
+          } catch (err) {
+            const msg = (err as { message?: string })?.message ?? "";
+            if (SERVER_COMPONENT_COOKIE_ERROR.test(msg)) {
+              // Expected when called from a Server Component render. The
+              // proxy refresh path will write the cookie on the next request.
+              continue;
+            }
+            // Unknown failure — rethrow so it's visible.
+            throw err;
           }
-        } catch {
-          // Called from a Server Component render; safe to ignore because the
-          // proxy.ts refresh path also writes the cookie on the next request.
         }
       },
     },
