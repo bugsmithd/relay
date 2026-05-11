@@ -18,4 +18,20 @@ if [ -n "${staged_violations:-}" ]; then
   exit 1
 fi
 
+# 2. dangerouslySetInnerHTML in staged .ts/.tsx (Day 1B XSS gate).
+# Same exclusion shape as semgrep/repo-law/dangerous-html.yml paths.exclude.
+staged_xss_violations="$(
+  git diff --cached --name-only --diff-filter=ACMR \
+    | grep -E '\.(ts|tsx)$' \
+    | grep -vE '^(tests/|semgrep/repo-law/fixtures/|evidence/|docs/|\.claude/|\.planning/)' \
+    | xargs -I{} sh -c 'grep -lE "dangerouslySetInnerHTML" "{}" 2>/dev/null || true' \
+    || true
+)"
+
+if [ -n "${staged_xss_violations:-}" ]; then
+  echo "pre-commit: dangerouslySetInnerHTML found in staged .ts/.tsx:" >&2
+  echo "${staged_xss_violations}" >&2
+  exit 1
+fi
+
 exit 0

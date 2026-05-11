@@ -1,5 +1,5 @@
-# Relay Day 1A Makefile.
-# Day 1B/2 targets land later. Do not add stop-condition targets that don't exist.
+# Relay Day 1A/1B Makefile.
+# Day 2+ targets land later. Do not add stop-condition targets that don't exist.
 
 SHELL := /usr/bin/env bash
 NODE ?= node
@@ -36,6 +36,27 @@ repo-law:
 	# Negative: repo scan must NOT fire (real rule has paths.exclude).
 	$(SEMGREP) scan --error --quiet --no-git-ignore \
 	  --config semgrep/repo-law/service-role-boundary.yml \
+	  --exclude semgrep/repo-law/fixtures \
+	  --exclude node_modules \
+	  --exclude .next \
+	  --exclude evidence \
+	  .
+	# Day 1B: dangerous-html positive fixture MUST fire (no paths.exclude in fixture rule).
+	@out=$$($(SEMGREP) scan --quiet --no-git-ignore --error \
+	  --config semgrep/repo-law/fixtures/dangerous-html.yml \
+	  semgrep/repo-law/fixtures/dangerous-html.test.tsx 2>&1); \
+	  status=$$?; \
+	  echo "$$out"; \
+	  if [ $$status -eq 0 ]; then \
+	    echo "repo-law: dangerous-html positive fixture did not fire" >&2; exit 1; \
+	  fi
+	# Day 1B: dangerous-html negative fixture MUST NOT fire.
+	$(SEMGREP) scan --error --quiet --no-git-ignore \
+	  --config semgrep/repo-law/fixtures/dangerous-html.yml \
+	  semgrep/repo-law/fixtures/dangerous-html-safe.tsx
+	# Day 1B: dangerous-html repo scan MUST NOT fire (real rule has paths.exclude).
+	$(SEMGREP) scan --error --quiet --no-git-ignore \
+	  --config semgrep/repo-law/dangerous-html.yml \
 	  --exclude semgrep/repo-law/fixtures \
 	  --exclude node_modules \
 	  --exclude .next \

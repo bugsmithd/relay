@@ -1,0 +1,7 @@
+rules:
+  - id: dangerous-html
+    message: |
+      dangerouslySetInnerHTML is banned in app code (XSS risk).
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-regex: \bdangerouslySetInnerHTML\b

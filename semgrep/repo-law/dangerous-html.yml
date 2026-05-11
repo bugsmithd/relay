@@ -1,0 +1,20 @@
+rules:
+  - id: dangerous-html
+    message: |
+      dangerouslySetInnerHTML is banned repository-wide (Day 1B XSS gate).
+      The prop bypasses React's escaping and lets attacker-controlled HTML run
+      in the document. If sanitization is genuinely required, do it on a server
+      boundary and pass already-safe text; do not reintroduce this prop.
+    severity: ERROR
+    languages: [typescript, javascript]
+    paths:
+      exclude:
+        - "**/semgrep/repo-law/fixtures/**"
+        - "**/tests/**"
+        - "**/evidence/**"
+        - "**/docs/**"
+        - "**/.claude/**"
+        - "**/.planning/**"
+        - "**/node_modules/**"
+        - "**/.next/**"
+    pattern-regex: \bdangerouslySetInnerHTML\b
