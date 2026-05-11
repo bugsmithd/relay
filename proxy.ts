@@ -24,12 +24,6 @@ const CSP_VALUE =
 // Next-default Cache-Control that the framework attaches to 404 / redirect
 // responses (verified: Next 16 emits `private, no-cache, no-store, max-age=0,
 // must-revalidate` on its built-in 404 before the proxy override).
-// Day-1B-only synthetic 404 for matched `/api/*` paths. See proxy() body for
-// why `NextResponse.next()` is unsafe for /api/* on a 404 path in Next 16.
-function api404(): NextResponse {
-  return securityHeaders(new NextResponse(null, { status: 404 }));
-}
-
 function securityHeaders(res: NextResponse): NextResponse {
   res.headers.set("cache-control", "no-store, private");
   res.headers.set("content-security-policy", CSP_VALUE);
@@ -41,6 +35,12 @@ function securityHeaders(res: NextResponse): NextResponse {
   res.headers.set("x-content-type-options", "nosniff");
   res.headers.set("x-frame-options", "DENY");
   return res;
+}
+
+// Day-1B-only synthetic 404 for matched `/api/*` paths. See proxy() body for
+// why `NextResponse.next()` is unsafe for /api/* on a 404 path in Next 16.
+function api404(): NextResponse {
+  return securityHeaders(new NextResponse(null, { status: 404 }));
 }
 
 // Next 16 deprecated `middleware.ts` in favor of `proxy.ts` with `proxy` export.
