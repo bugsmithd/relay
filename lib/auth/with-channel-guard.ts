@@ -16,8 +16,8 @@ export type ChannelContext = WorkspaceContext & {
 // Canonical lowercase-hex UUID shape. Rejected channelIds collapse to the
 // unified-deny branch (§A.1 + §A.5) before the channel DB lookup. The
 // workspace DB lookup precedes this via withWorkspaceGuard composition
-// (§A.2); an invalid channelId never reaches the channel/channel_members
-// query at lines 107-113.
+// (§A.2); an invalid channelId never reaches the channels/channel_members
+// supabase-js call below.
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -88,9 +88,9 @@ export async function withChannelGuard<T>(
     const userId = workspaceCtx.user.id;
 
     // §A.1: UUID-shape rejection. Invalid shapes never reach the
-    // channel/channel_members query at lines 109-115. (The workspace DB
+    // channels/channel_members supabase-js call below. (The workspace DB
     // lookup precedes this via withWorkspaceGuard composition; see the
-    // file-level comment at lines 16-20.)
+    // file-level comment above.)
     if (!UUID_RE.test(channelId)) {
       unifiedDeny(slug, channelId, userId);
     }
