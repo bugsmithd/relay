@@ -87,7 +87,10 @@ export async function withChannelGuard<T>(
     const slug = workspaceCtx.workspace.slug;
     const userId = workspaceCtx.user.id;
 
-    // §A.1: pre-DB UUID-shape rejection. Invalid shapes never reach Postgres.
+    // §A.1: UUID-shape rejection. Invalid shapes never reach the
+    // channel/channel_members query at lines 109-115. (The workspace DB
+    // lookup precedes this via withWorkspaceGuard composition; see the
+    // file-level comment at lines 16-20.)
     if (!UUID_RE.test(channelId)) {
       unifiedDeny(slug, channelId, userId);
     }
