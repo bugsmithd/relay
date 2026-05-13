@@ -37,8 +37,13 @@ function securityHeaders(res: NextResponse): NextResponse {
   return res;
 }
 
-// Day-1B-only synthetic 404 for matched `/api/*` paths. See proxy() body for
-// why `NextResponse.next()` is unsafe for /api/* on a 404 path in Next 16.
+// Proxy-owned headered 404 for unknown `/api/*` paths. Phase 4 adds a single
+// pass-through special case above for `/api/messages` (the only known
+// Phase-4 API route — see docs/tasks/day-2a-phase4-proxy-message-paths.md
+// §"Proxy two-branch policy semantics"). `NextResponse.next()` is unsafe on
+// a built-in 404 path in Next 16 because the framework overrides
+// middleware-set `Cache-Control`; the synthetic 404 here preserves Day-1B
+// headers byte-identical for every path the route handler does not own.
 function api404(): NextResponse {
   return securityHeaders(new NextResponse(null, { status: 404 }));
 }
@@ -57,13 +62,27 @@ function api404(): NextResponse {
 // reassignment inside `setAll`.
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl;
+
+  // Phase-4 known-route pass-through. MUST run BEFORE the missing-Supabase-env
+  // fail-closed branch so a misconfigured deploy does NOT silently swallow
+  // /api/messages with the proxy-owned empty-body 404 (which would diverge
+  // from the route handler's byte-identical `{}` deny shape). The route
+  // handler's try-catch around createSupabaseServerClient() collapses the
+  // missing-env failure to D-9 (byte-identical 404 + {} + Day-1B headers),
+  // so it is safe for the proxy to hand off even when env is unset. Literal
+  // `===` for exactly one known route — see slice contract §"Proxy two-branch
+  // policy semantics" (no startsWith, no regex, no route-registry).
+  if (url.pathname === "/api/messages") {
+    return securityHeaders(NextResponse.next({ request: req }));
+  }
+
   const isWorkspacePath = url.pathname.startsWith("/w/");
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !anonKey) {
-    // Fail-closed for `/w/*`: redirect to /login. `/api/*` returns a synthetic
-    // 404 from the proxy (see api404 below for the Day-1B-only rationale).
+    // Fail-closed for `/w/*`: redirect to /login. Unknown `/api/*` returns
+    // the Day-1B headered 404 (api404 above).
     if (isWorkspacePath) {
       return securityHeaders(
         NextResponse.redirect(new URL("/login", url.origin)),
@@ -72,14 +91,9 @@ export async function proxy(req: NextRequest) {
     return api404();
   }
 
-  // `/api/*` in Day 1B has no auth gate and no API routes. We must NOT call
-  // `NextResponse.next()` here: Next 16's built-in 404 handler overrides
-  // middleware-set `Cache-Control` with its own (`private, no-cache, no-store,
-  // max-age=0, must-revalidate`), which silently regresses Stop Condition #4.
-  // Returning a synthetic 404 from the proxy keeps our headers intact.
-  //
-  // Day 2A will introduce real API routes and must refactor this branch — the
-  // synthetic 404 is correct only while no API routes exist.
+  // Unknown `/api/*` fallback. Returns the Day-1B headered 404 shape
+  // (see api404 above for why NextResponse.next() is unsafe on an
+  // unowned /api/* path in Next 16).
   if (!isWorkspacePath) {
     return api404();
   }
